@@ -1,5 +1,6 @@
 # Deploying Nutrix
 
+
 Nutrix is a small static web app split into three files:
 
 - `nutrix.html` for the page structure
@@ -18,7 +19,7 @@ For deployment at a root URL like `https://your-site.com/`, most static hosts ex
    ```js
    var CONFIG = {
      API_KEY: "AIza...your key here...",
-     MODEL: "gemini-2.0-flash"
+     MODEL: "gemini-2.5-flash-lite"
    };
    ```
 
@@ -57,7 +58,7 @@ Example using a Vercel serverless function:
 Create `api/gemini.js` in your project:
 ```js
 export default async function handler(req, res) {
-  const model = req.body.model || "gemini-2.0-flash";
+  const model = req.body.model || "gemini-2.5-flash-lite";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
   const response = await fetch(url, {
     method: "POST",
