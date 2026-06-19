@@ -11,14 +11,13 @@
    ============================================================ */
 
 const CONFIG = {
-  API_KEY:  env.API_KEY,
-  MODEL: typeof env !== 'undefined' ? env.MODEL : "gemini-2.0-flash"
+  API_KEY: typeof env !== 'undefined' ? env.API_KEY : "",
+  MODEL: typeof env !== 'undefined' ? env.MODEL : "gemini-2.5-flash-lite"
 };
 
 // ... rest of your Nutrix application logic (Chart.js, page switching, etc.) ...
 
 if(!CONFIG.API_KEY){
-  console.out(CONFIG.API_KEY);
   document.getElementById('setup-banner').classList.add('show');
 }
 
