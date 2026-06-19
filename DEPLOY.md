@@ -1,5 +1,6 @@
 # Deploying Nutrix
 
+
 Nutrix is a small static web app split into three files:
 
 - `nutrix.html` for the page structure
