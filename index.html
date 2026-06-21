@@ -86,6 +86,7 @@
     <button class="btn-add" id="log-food-btn">Log ↗</button>
   </div>
   <input type="file" id="photo-upload" class="hidden-input" accept="image/*">
+  <div id="today-photo-preview" class="today-photo-preview"></div>
   <img id="preview-img" alt="Uploaded food preview">
   <div id="ai-result"></div>
 </div>
@@ -168,12 +169,12 @@
   <div class="section-label">Your details</div>
   <div class="profile-section">
     <div class="profile-row">
-      <div class="field-group"><div class="field-label">Age</div><input class="field-input" id="p-age" type="number" value="25"></div>
+      <div class="field-group"><div class="field-label">Age</div><input class="field-input" id="p-age" type="number" value="25" min="13" max="100" step="1"></div>
       <div class="field-group"><div class="field-label">Gender</div><select class="field-input" id="p-gender"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
     <div class="profile-row">
-      <div class="field-group"><div class="field-label">Height (cm)</div><input class="field-input" id="p-height" type="number" value="175"></div>
-      <div class="field-group"><div class="field-label">Weight (kg)</div><input class="field-input" id="p-weight" type="number" value="70"></div>
+      <div class="field-group"><div class="field-label">Height (cm)</div><input class="field-input" id="p-height" type="number" value="175" min="100" max="250" step="0.1"></div>
+      <div class="field-group"><div class="field-label">Weight (kg)</div><input class="field-input" id="p-weight" type="number" value="70" min="30" max="300" step="0.1"></div>
     </div>
     <div class="field-group"><div class="field-label">Activity level</div>
       <select class="field-input" id="p-activity">

@@ -68,8 +68,9 @@ async function callGemini(opts){
 }
 
 var state={calories:0,protein:0,carbs:0,fat:0,fiber:0,calTarget:2200,protTarget:165,carbTarget:248,fatTarget:61,fiberTarget:30,
+  meals:[],
   chatHistory:[{role:'assistant',content:"Hey! I'm your Nutrix AI — powered by Gemini. Ask me anything about your nutrition, log meals by description, or share a food photo for instant analysis."}],
-  chatPhotoB64:null,chatPhotoMime:null};
+  chatPhotoB64:null,chatPhotoMime:null,pendingFoodPhotoB64:null,pendingFoodPhotoMime:null,pendingFoodPhotoName:null};
 
 function showPage(id,btn){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -142,59 +143,152 @@ function checkKey(){
   return true;
 }
 
-var NUTRITION_PROMPT_SUFFIX = 'Reply in this exact format — no extra text:\nFood: [name]\nCalories: [N]\nProtein: [N]g\nCarbs: [N]g\nFat: [N]g\nFiber: [N]g\nNote: [1 sentence tip]';
+var NUTRITION_PROMPT_SUFFIX = 'Reply in this exact format — no extra text:\nAction: [add or update_last]\nFood: [name]\nCalories: [N]\nProtein: [N]g\nCarbs: [N]g\nFat: [N]g\nFiber: [N]g\nNote: [1 sentence tip]';
+
+function clampNumber(value,min,max,fallback){
+  var n=parseFloat(value);
+  if(!isFinite(n)) n=fallback;
+  return Math.min(Math.max(n,min),max);
+}
+
+function parseNutritionNumber(value){
+  var n=parseFloat(String(value || '').replace(/[^\d.-]/g,''));
+  if(!isFinite(n)) return 0;
+  return Math.max(0, Math.round(n));
+}
+
+function getNutritionLine(lines,key){
+  key=key.toLowerCase();
+  return lines.find(function(x){return x.trim().toLowerCase().indexOf(key+':')===0;}) || '';
+}
 
 function renderNutritionResult(foodName,cal,prot,carbs,fat,note){
   return '<strong>'+foodName+'</strong><br><span class="result-cal">'+cal+' kcal</span> &nbsp;·&nbsp; Protein <span class="result-protein">'+prot+'g</span> &nbsp;·&nbsp; Carbs <span class="result-carbs">'+carbs+'g</span> &nbsp;·&nbsp; Fat <span class="result-fat">'+fat+'g</span>'+(note?'<br><span class="result-note">'+note+'</span>':'');
 }
 
-function applyNutritionText(text, res, fallbackName){
-  var lines=text.split('\n');
-  var parse=function(k){var l=lines.find(function(x){return x.startsWith(k);});return l?parseInt(l.split(':')[1])||0:0;};
-  var cal=parse('Calories'),prot=parse('Protein'),carbs=parse('Carbs'),fat=parse('Fat'),fiber=parse('Fiber');
-  state.calories+=cal;state.protein+=prot;state.carbs+=carbs;state.fat+=fat;state.fiber+=fiber;
-  var foodName=(lines[0]||'').replace('Food:','').trim()||fallbackName;
-  var note=(lines.find(function(x){return x.startsWith('Note');})||'').replace('Note:','').trim();
-  res.innerHTML=renderNutritionResult(foodName,cal,prot,carbs,fat,note);
-  var item=document.createElement('div');item.className='meal-item';
-  item.innerHTML='<div><div class="meal-name">'+foodName+'</div><div class="meal-macros">Carbs '+carbs+'g · Protein '+prot+'g · Fat '+fat+'g</div></div><div class="meal-cal">'+cal+'</div>';
-  document.getElementById('meal-list').appendChild(item);
+function recalculateTotals(){
+  state.calories=0;state.protein=0;state.carbs=0;state.fat=0;state.fiber=0;
+  state.meals.forEach(function(meal){
+    state.calories+=meal.calories;
+    state.protein+=meal.protein;
+    state.carbs+=meal.carbs;
+    state.fat+=meal.fat;
+    state.fiber+=meal.fiber;
+  });
+}
+
+function renderMealList(){
+  var list=document.getElementById('meal-list');
+  list.innerHTML='';
+  state.meals.forEach(function(meal){
+    var item=document.createElement('div');item.className='meal-item';
+    item.innerHTML='<div><div class="meal-name">'+meal.foodName+'</div><div class="meal-macros">Carbs '+meal.carbs+'g · Protein '+meal.protein+'g · Fat '+meal.fat+'g</div></div><div class="meal-cal">'+meal.calories+'</div>';
+    list.appendChild(item);
+  });
+}
+
+function saveMealNutrition(action,meal){
+  if(action==='update_last' && state.meals.length){
+    state.meals[state.meals.length-1]=meal;
+  }else{
+    state.meals.push(meal);
+  }
+  recalculateTotals();
+  renderMealList();
   animateRings();
 }
 
+function applyManualCorrectionRequest(text,res){
+  if(!state.meals.length || state.pendingFoodPhotoB64) return false;
+  if(!/(change|set|make|correct|update|actually|should be)/i.test(text)) return false;
+  var fields={
+    calories:['calories','calorie','kcal'],
+    protein:['protein','protien'],
+    carbs:['carbs','carbohydrates','carb'],
+    fat:['fat'],
+    fiber:['fiber','fibre']
+  };
+  var meal=Object.assign({}, state.meals[state.meals.length-1]);
+  var changed=false;
+  Object.keys(fields).forEach(function(field){
+    fields[field].forEach(function(label){
+      var after=new RegExp(label+'[^\\d-]{0,30}(-?\\d+(?:\\.\\d+)?)','i').exec(text);
+      var before=new RegExp('(-?\\d+(?:\\.\\d+)?)\\s*(?:g|grams|kcal|calories)?\\s*(?:of\\s+)?'+label,'i').exec(text);
+      var match=after || before;
+      if(match){
+        meal[field]=parseNutritionNumber(match[1]);
+        changed=true;
+      }
+    });
+  });
+  if(!changed) return false;
+  saveMealNutrition('update_last',meal);
+  res.style.display='block';
+  res.innerHTML=renderNutritionResult(meal.foodName,meal.calories,meal.protein,meal.carbs,meal.fat,'Updated the last meal.');
+  return true;
+}
+
+function applyNutritionText(text, res, fallbackName){
+  var lines=text.split('\n');
+  var parse=function(k){var l=getNutritionLine(lines,k);return l?parseNutritionNumber(l.split(':').slice(1).join(':')):0;};
+  var action=(getNutritionLine(lines,'Action').split(':').slice(1).join(':').trim() || 'add').toLowerCase();
+  action=action==='update_last' ? 'update_last' : 'add';
+  var cal=parse('Calories'),prot=parse('Protein'),carbs=parse('Carbs'),fat=parse('Fat'),fiber=parse('Fiber');
+  var foodName=getNutritionLine(lines,'Food').replace(/^Food:/i,'').trim()||fallbackName;
+  var note=getNutritionLine(lines,'Note').replace(/^Note:/i,'').trim();
+  saveMealNutrition(action,{foodName:foodName,calories:cal,protein:prot,carbs:carbs,fat:fat,fiber:fiber});
+  res.innerHTML=renderNutritionResult(foodName,cal,prot,carbs,fat,note);
+}
+
 async function logFoodAI(){
-  var txt=document.getElementById('food-input').value.trim();if(!txt)return;
+  var txt=document.getElementById('food-input').value.trim();
+  if(!txt&&!state.pendingFoodPhotoB64)return;
+  var res=document.getElementById('ai-result');
+  if(txt && applyManualCorrectionRequest(txt,res)){
+    document.getElementById('food-input').value='';
+    return;
+  }
   if(!checkKey())return;
   document.getElementById('food-input').value='';
-  var res=document.getElementById('ai-result');res.style.display='block';res.innerHTML='<span class="ai-muted">Analysing with Gemini...</span>';
+  res.style.display='block';res.innerHTML='<span class="ai-muted">Analysing with Gemini...</span>';
   try{
-    var prompt='You are a precise nutrition analyst. The user logged: "'+txt+'". Estimate calories, protein (g), carbs (g), fat (g), fiber (g). '+NUTRITION_PROMPT_SUFFIX;
-    var d=await callGemini({contents:[{role:'user',parts:[{text:prompt}]}]});
+    var previous=state.meals.length ? JSON.stringify(state.meals[state.meals.length-1]) : 'none';
+    var prompt='You are a precise nutrition analyst. The user logged: "'+(txt || 'food photo')+'". Last logged meal: '+previous+'. If the user is correcting the last meal, return Action: update_last and the full corrected totals for that meal, not the difference. Otherwise return Action: add. Estimate calories, protein (g), carbs (g), fat (g), fiber (g). '+NUTRITION_PROMPT_SUFFIX;
+    var parts=[];
+    if(state.pendingFoodPhotoB64) parts.push({inline_data:{mime_type:state.pendingFoodPhotoMime,data:state.pendingFoodPhotoB64}});
+    parts.push({text:prompt});
+    var d=await callGemini({contents:[{role:'user',parts:parts}]});
     if(d.error){res.innerHTML='<span class="ai-error">API error: '+d.error+'</span>';return;}
-    applyNutritionText(d.text, res, txt);
+    applyNutritionText(d.text, res, txt || 'Analysed meal');
+    clearPendingFoodPhoto();
   }catch(e){res.innerHTML='<span class="ai-error">Error: '+e.message+'</span>';}
 }
 
 function handlePhoto(input){
   var file=input.files[0];if(!file)return;
-  if(!checkKey())return;
   var prev=document.getElementById('preview-img');
   var reader=new FileReader();
-  reader.onload=async function(e){
+  reader.onload=function(e){
     prev.src=e.target.result;prev.style.display='block';
-    var res=document.getElementById('ai-result');res.style.display='block';res.innerHTML='<span class="ai-muted">Analysing your photo...</span>';
-    var b64=e.target.result.split(',')[1];
-    try{
-      var prompt='You are a precise nutrition analyst. Identify all food in this image and estimate totals. '+NUTRITION_PROMPT_SUFFIX;
-      var d=await callGemini({contents:[{role:'user',parts:[
-        {inline_data:{mime_type:file.type,data:b64}},
-        {text:prompt}
-      ]}]});
-      if(d.error){res.innerHTML='<span class="ai-error">API error: '+d.error+'</span>';return;}
-      applyNutritionText(d.text, res, 'Analysed meal');
-    }catch(e){res.innerHTML='<span class="ai-error">Error: '+e.message+'</span>';}
+    state.pendingFoodPhotoB64=e.target.result.split(',')[1];
+    state.pendingFoodPhotoMime=file.type;
+    state.pendingFoodPhotoName=file.name;
+    var label=document.getElementById('today-photo-preview');
+    label.style.display='block';
+    label.textContent='Photo attached: '+file.name;
   };
   reader.readAsDataURL(file);
+}
+
+function clearPendingFoodPhoto(){
+  state.pendingFoodPhotoB64=null;
+  state.pendingFoodPhotoMime=null;
+  state.pendingFoodPhotoName=null;
+  document.getElementById('photo-upload').value='';
+  document.getElementById('preview-img').style.display='none';
+  var label=document.getElementById('today-photo-preview');
+  label.style.display='none';
+  label.textContent='';
 }
 
 function handleChatPhoto(input){
@@ -267,10 +361,13 @@ function bindEvents(){
 }
 
 function calcTargets(){
-  var age=parseInt(document.getElementById('p-age').value)||25;
+  var age=Math.round(clampNumber(document.getElementById('p-age').value,13,100,25));
   var gender=document.getElementById('p-gender').value;
-  var h=parseFloat(document.getElementById('p-height').value)||175;
-  var w=parseFloat(document.getElementById('p-weight').value)||70;
+  var h=clampNumber(document.getElementById('p-height').value,100,250,175);
+  var w=clampNumber(document.getElementById('p-weight').value,30,300,70);
+  document.getElementById('p-age').value=age;
+  document.getElementById('p-height').value=h;
+  document.getElementById('p-weight').value=w;
   var act=parseFloat(document.getElementById('p-activity').value)||1.55;
   var goal=document.getElementById('p-goal').value;
   var bmr=gender==='male'?(10*w)+(6.25*h)-(5*age)+5:(10*w)+(6.25*h)-(5*age)-161;
