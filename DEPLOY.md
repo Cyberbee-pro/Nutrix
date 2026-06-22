@@ -37,6 +37,7 @@ In Vercel Dashboard:
 5. Select Production, Preview, and Development
 6. Save, then redeploy
 
+<<<<<<< HEAD
 ## Backend database setup
 
 The Trends page now reads from MongoDB through backend endpoints. Add this environment variable in Vercel and in `.env.local` for local testing:
@@ -53,6 +54,8 @@ The app uses the `nutrix` database and creates/reads these collections:
 
 Meal logs are saved through `POST /api/meals`, and Trends loads aggregated chart data from `GET /api/trends?userId=...&period=weekly`.
 
+=======
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
 ## Step 3 — Deploy on Vercel
 
 1. Install the CLI: `npm i -g vercel`

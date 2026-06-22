@@ -67,6 +67,7 @@ async function callGemini(opts){
   return {text: text};
 }
 
+<<<<<<< HEAD
 async function apiFetch(path, options){
   var response = await fetch(path, Object.assign({
     headers: {'Content-Type': 'application/json'}
@@ -105,6 +106,9 @@ async function getOrCreateUserId(){
 }
 
 var state={userId:null,calories:0,protein:0,carbs:0,fat:0,fiber:0,calTarget:2200,protTarget:165,carbTarget:248,fatTarget:61,fiberTarget:30,
+=======
+var state={calories:0,protein:0,carbs:0,fat:0,fiber:0,calTarget:2200,protTarget:165,carbTarget:248,fatTarget:61,fiberTarget:30,
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
   meals:[],
   chatHistory:[{role:'assistant',content:"Hey! I'm your Nutrix AI — powered by Gemini. Ask me anything about your nutrition, log meals by description, or share a food photo for instant analysis."}],
   chatPhotoB64:null,chatPhotoMime:null,pendingFoodPhotoB64:null,pendingFoodPhotoMime:null,pendingFoodPhotoName:null};
@@ -114,7 +118,11 @@ function showPage(id,btn){
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('page-'+id).classList.add('active');
   if(btn){btn.classList.add('active');}
+<<<<<<< HEAD
   if(id==='trends'){setTimeout(loadTrendData,80);}
+=======
+  if(id==='trends'){setTimeout(initCharts,80);}
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
   if(id==='today'){setTimeout(animateRings,100);}
 }
 
@@ -138,6 +146,7 @@ function animateRings(){
 
 var trendChart=null,macroChart=null,donutActual=null,donutIdeal=null,trendMode='weekly';
 var trendData={
+<<<<<<< HEAD
   daily:{labels:['12am','4am','8am','12pm','4pm','8pm'],cal:[0,0,0,0,0,0],target:2200,macros:{p:[0,0,0,0,0,0],c:[0,0,0,0,0,0],f:[0,0,0,0,0,0]}},
   weekly:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],cal:[0,0,0,0,0,0,0],target:2200,macros:{p:[0,0,0,0,0,0,0],c:[0,0,0,0,0,0,0],f:[0,0,0,0,0,0,0]}},
   monthly:{labels:['Week 1','Week 2','Week 3','Week 4','Week 5'],cal:[0,0,0,0,0],target:2200,macros:{p:[0,0,0,0,0],c:[0,0,0,0,0],f:[0,0,0,0,0]}}
@@ -222,6 +231,13 @@ function refreshLocalTrendData(period){
   trendData[period]=data;
 }
 
+=======
+  daily:{labels:['6am','9am','12pm','3pm','6pm','9pm'],cal:[0,0,0,0,0,0],target:2200,macros:{p:[0,0,0,0,0,0],c:[0,0,0,0,0,0],f:[0,0,0,0,0,0]}},
+  weekly:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],cal:[0,0,0,0,0,0,0],target:2200,macros:{p:[0,0,0,0,0,0,0],c:[0,0,0,0,0,0,0],f:[0,0,0,0,0,0,0]}},
+  monthly:{labels:['Week 1','Week 2','Week 3','Week 4'],cal:[0,0,0,0],target:2200,macros:{p:[0,0,0,0],c:[0,0,0,0],f:[0,0,0,0]}}
+};
+
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
 function switchTrend(mode,btn){
   trendMode=mode;
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
@@ -230,6 +246,7 @@ function switchTrend(mode,btn){
   var subs={daily:'Cumulative calorie intake',weekly:'Daily calories vs target',monthly:'Weekly averages'};
   document.getElementById('trend-title').textContent=titles[mode];
   document.getElementById('trend-sub').textContent=subs[mode];
+<<<<<<< HEAD
   loadTrendData();
 }
 
@@ -271,6 +288,9 @@ async function loadTrendData(){
     state.trendsLoading=false;
     initCharts();
   }
+=======
+  initCharts();
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
 }
 
 function initCharts(){
@@ -343,6 +363,7 @@ function renderMealList(){
   });
 }
 
+<<<<<<< HEAD
 function getMealId(meal){
   return meal && (meal.id || meal._id);
 }
@@ -393,6 +414,8 @@ async function persistMealNutrition(action,meal){
   }
 }
 
+=======
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
 function saveMealNutrition(action,meal){
   if(action==='update_last' && state.meals.length){
     state.meals[state.meals.length-1]=meal;
@@ -402,7 +425,10 @@ function saveMealNutrition(action,meal){
   recalculateTotals();
   renderMealList();
   animateRings();
+<<<<<<< HEAD
   persistMealNutrition(action,meal);
+=======
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
 }
 
 function applyManualCorrectionRequest(text,res){
@@ -599,4 +625,7 @@ function calcTargets(){
 
 bindEvents();
 setTimeout(animateRings,350);
+<<<<<<< HEAD
 // export default app;
+=======
+>>>>>>> 31a8d0f55f4ef128f2b2f8cbc9b444d70dd662b1
