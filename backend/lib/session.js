@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
-const MAX_MEALS = 40;
+const MAX_MEALS = 20;
 
 const COOKIES = {
   userId: 'nutrix_user_id',

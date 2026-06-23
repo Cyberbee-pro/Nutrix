@@ -12,8 +12,81 @@ const CONFIG = {
 };
 // ... rest of your Nutrix application logic (Chart.js, page switching, etc.) ...
 
+var CLIENT_COOKIES={
+  userId:'nutrix_client_user_id',
+  profile:'nutrix_client_profile',
+  meals:'nutrix_client_meals'
+};
+var COOKIE_MAX_AGE=60*60*24*365;
+var COOKIE_MEAL_LIMIT=20;
+
 if(!CONFIG.API_KEY && location.protocol === 'file:'){
   document.getElementById('setup-banner').classList.add('show');
+}
+
+function readCookie(name){
+  return document.cookie.split(';').map(function(part){return part.trim();}).reduce(function(value,part){
+    if(value) return value;
+    return part.indexOf(name+'=')===0 ? decodeURIComponent(part.slice(name.length+1)) : '';
+  },'');
+}
+
+function writeCookie(name,value){
+  document.cookie=name+'='+encodeURIComponent(value)+'; Path=/; Max-Age='+COOKIE_MAX_AGE+'; SameSite=Lax';
+}
+
+function encodeCookieJson(value){
+  return btoa(unescape(encodeURIComponent(JSON.stringify(value))));
+}
+
+function decodeCookieJson(value,fallback){
+  if(!value) return fallback;
+  try{
+    return JSON.parse(decodeURIComponent(escape(atob(value))));
+  }catch(e){
+    return fallback;
+  }
+}
+
+function getCookieUserId(){
+  var existing=readCookie(CLIENT_COOKIES.userId);
+  if(existing) return existing;
+  var next=window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+'-'+Math.random().toString(36).slice(2);
+  writeCookie(CLIENT_COOKIES.userId,next);
+  return next;
+}
+
+function saveStateCookies(){
+  writeCookie(CLIENT_COOKIES.userId,state.userId || getCookieUserId());
+  writeCookie(CLIENT_COOKIES.profile,encodeCookieJson({
+    age:parseInt(document.getElementById('p-age').value,10) || 25,
+    gender:document.getElementById('p-gender').value,
+    heightCm:parseFloat(document.getElementById('p-height').value) || 175,
+    weightKg:parseFloat(document.getElementById('p-weight').value) || 70,
+    activityLevel:parseFloat(document.getElementById('p-activity').value) || 1.55,
+    goal:document.getElementById('p-goal').value,
+    calorieTarget:state.calTarget,
+    proteinTarget:state.protTarget,
+    carbTarget:state.carbTarget,
+    fatTarget:state.fatTarget,
+    fiberTarget:state.fiberTarget
+  }));
+  writeCookie(CLIENT_COOKIES.meals,encodeCookieJson(state.meals.slice(-COOKIE_MEAL_LIMIT)));
+}
+
+function loadStateCookies(){
+  var userId=readCookie(CLIENT_COOKIES.userId);
+  var profile=decodeCookieJson(readCookie(CLIENT_COOKIES.profile),null);
+  var meals=decodeCookieJson(readCookie(CLIENT_COOKIES.meals),[]);
+  if(userId) state.userId=userId;
+  if(profile) applyProfile(profile);
+  if(Array.isArray(meals) && meals.length){
+    state.meals=meals;
+    recalculateTotals();
+    renderMealList();
+    animateRings();
+    refreshLocalTrendData(trendMode);
+  }
 }
 
 function geminiUrl(){
@@ -86,14 +159,16 @@ async function apiFetch(path, options){
 
 async function getOrCreateUserId(){
   if(state.userId) return state.userId;
-  if(location.protocol === 'file:') return null;
+  state.userId=getCookieUserId();
+  if(location.protocol === 'file:') return state.userId;
 
   var data = await apiFetch('/api/users/anonymous', {
     method: 'POST',
-    body: JSON.stringify({})
+    body: JSON.stringify({userId:state.userId})
   });
 
   state.userId = data.user && data.user.id;
+  writeCookie(CLIENT_COOKIES.userId,state.userId);
   return state.userId;
 }
 
@@ -447,6 +522,7 @@ async function persistMealNutrition(action,meal){
 
     if(saved && saved.meal && saved.meal.id){
       meal.id=saved.meal.id;
+      saveStateCookies();
     }
     if(isTrendsPageActive()) loadTrendData();
   }catch(e){
@@ -463,6 +539,7 @@ function saveMealNutrition(action,meal){
   recalculateTotals();
   renderMealList();
   animateRings();
+  saveStateCookies();
   persistMealNutrition(action,meal);
 }
 
@@ -690,6 +767,7 @@ function applyProfile(profile){
 }
 
 async function saveProfile(profile){
+  saveStateCookies();
   if(location.protocol === 'file:') return;
   try{
     await getOrCreateUserId();
@@ -703,6 +781,7 @@ async function saveProfile(profile){
 }
 
 async function loadSavedState(){
+  loadStateCookies();
   if(location.protocol === 'file:') return;
   try{
     await getOrCreateUserId();
@@ -716,6 +795,7 @@ async function loadSavedState(){
       animateRings();
       refreshLocalTrendData(trendMode);
     }
+    saveStateCookies();
   }catch(e){
     console.warn('Could not load cookie session:', e.message);
   }

@@ -9,9 +9,10 @@
 
 ## Persistence
 
-Nutrix uses cookie-backed persistence instead of MongoDB.
+Nutrix uses cookie-backed persistence instead of MongoDB. The frontend writes browser cookies immediately so reload restores data even before the backend session responds.
 
-- `backend/lib/session.js` stores anonymous user id, profile, and recent meals in HTTP-only cookies.
+- `frontend/script.js` stores anonymous user id, profile, and recent meals in browser cookies.
+- `backend/lib/session.js` mirrors anonymous user id, profile, and recent meals in HTTP-only cookies when served through Vercel.
 - `GET /api/meals` reads meals from the cookie session.
 - `POST /api/meals` appends a meal to the cookie session.
 - `PATCH /api/meals/:id` updates a saved meal in the cookie session.
